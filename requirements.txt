@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
 chromadb==1.5.9
 fastapi==0.141.1
 groq==1.6.0
@@ -9,12 +11,4 @@ rank_bm25==0.2.2
 sentence_transformers==6.0.0
 tavily_python==0.7.27
 tenacity==9.1.4
-jsonpatch==1.33
-jsonpointer==3.1.1
-jsonref==1.1.0
-jsonschema==4.26.0
-jsonschema-specifications==2025.9.1
-openai==2.54.0
 uvicorn==0.52.1
-websocket-client==1.9.0
-websockets==15.0.1
