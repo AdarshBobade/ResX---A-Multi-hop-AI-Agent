@@ -6,6 +6,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-frontend-61DAFB?logo=react)](https://react.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7?logo=render)](https://resx-a-multi-hop-ai-agent-frontend.onrender.com)
+
+**🔗 Live demo:** [resx-a-multi-hop-ai-agent-frontend.onrender.com](https://resx-a-multi-hop-ai-agent-frontend.onrender.com)
+
+> Hosted on Render's free tier — the backend spins down after ~15 minutes of inactivity, so the first request after a while can take 50+ seconds to wake up. Subsequent requests are fast.
 
 ## Overview
 
@@ -207,6 +212,34 @@ Open the Vite URL shown in the terminal, normally `http://localhost:5173`.
 3. Optionally enable **Web Search** or **Deep Research**.
 4. Inspect the synthesized answer, citations, research trail, groundedness score, and query statistics.
 
+## Deployment
+
+The app is containerized as two separate services — a FastAPI backend and an nginx-served React frontend — and deployed on [Render](https://render.com/) as two independent web services.
+
+### Run it with Docker locally
+
+```bash
+docker compose up --build
+```
+
+This builds and runs both containers together:
+
+- **backend** — `python:3.12-slim`, installs `requirements.txt` (CPU-only `torch` build to keep the image lean), runs `uvicorn app_data.main:app`.
+- **frontend** — multi-stage build: `node:22-alpine` builds the Vite app, then `nginx:alpine` serves the static bundle and reverse-proxies `/ask`, `/upload`, and `/documents` to the backend.
+
+Visit `http://localhost:5176` once both containers are up.
+
+### Deploying to Render
+
+Each service is a separate Render **Web Service** pointed at this repo:
+
+| Service | Root Directory | Notes |
+|---|---|---|
+| Backend | `.` (repo root) | Health check path: `/health` |
+| Frontend | `frontend` | Env var `BACKEND_URL` set to the backend's live Render URL |
+
+The frontend's `nginx.conf.template` proxies API routes to `${BACKEND_URL}` at container start (via nginx's built-in `envsubst` templating), so the same image works locally (`BACKEND_URL=http://backend:10000`) and in production (`BACKEND_URL=https://<backend>.onrender.com`) without a rebuild.
+
 ## Project Structure
 
 ```text
@@ -226,7 +259,13 @@ Multi-Hop-Retrieval-Agent/
 │   ├── evidence_format.py   # Evidence → LLM context formatting
 │   ├── config.py            # API clients and fallback logic
 │   └── prompts.py           # Agent prompts
-├── frontend/                # React + TypeScript UI
+├── frontend/                 # React + TypeScript UI
+│   ├── Dockerfile             # Multi-stage: Vite build → nginx serve
+│   ├── nginx.conf.template    # Reverse proxy to backend (envsubst at runtime)
+│   └── .dockerignore
+├── Dockerfile                 # Backend container (Python 3.12-slim + Uvicorn)
+├── docker-compose.yml         # Local dev: runs both services together
+├── .dockerignore
 ├── requirements.txt
 ├── .gitignore
 └── LICENSE
