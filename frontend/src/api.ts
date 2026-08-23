@@ -64,7 +64,7 @@ export async function pollUploadStatus(
   jobId: string,
   onUpdate?: (status: IngestionStatus) => void,
 ): Promise<IngestionStatus> {
-  const maxAttempts = 90
+  const maxAttempts = 300
   const intervalMs = 2000
 
   for (let i = 0; i < maxAttempts; i++) {
