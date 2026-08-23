@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { askQuestion, deleteDocument, uploadPdf } from './api'
+import { askQuestion, deleteDocument, uploadPdf, pollUploadStatus } from './api'
 import type { AskResponse, Conversation, Document } from './types'
 import './App.css'
 
@@ -184,6 +184,7 @@ function App() {
   const [deepResearch, setDeepResearch] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadStage, setUploadStage] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -259,14 +260,28 @@ function App() {
 
     setUploading(true)
     setUploadError(null)
+    setUploadStage('Uploading…')
 
     try {
-      const data = await uploadPdf(file)
-      setUploads((prev) => [data, ...prev])
+      const { job_id } = await uploadPdf(file)
+      setUploadStage('Processing document…')
+      const status = await pollUploadStatus(job_id)
+
+      setUploads((prev) => [
+        {
+          doc_id: status.doc_id ?? job_id,
+          filename: status.filename ?? file.name,
+          chunks: status.chunks,
+          pages: status.pages,
+          path: status.path,
+        },
+        ...prev,
+      ])
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {
       setUploading(false)
+      setUploadStage('')
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -348,7 +363,7 @@ function App() {
               {uploading ? (
                 <>
                   <span className="spinner spinner-dark" aria-hidden="true" />
-                  Ingesting PDF…
+                  {uploadStage || 'Ingesting PDF…'}
                 </>
               ) : (
                 'Drop a PDF here, or browse'

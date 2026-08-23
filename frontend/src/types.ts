@@ -51,6 +51,22 @@ export type UploadResponse = {
   path: string
 }
 
+export type UploadJobResponse = {
+  job_id: string
+  status: string
+}
+
+export type IngestionStatus = {
+  status: 'processing' | 'ready' | 'failed'
+  doc_id?: string
+  filename?: string
+  chunks?: number
+  pages?: number
+  already_exists?: boolean
+  path?: string
+  error?: string
+}
+
 export type Document = {
   doc_id: string
   filename: string

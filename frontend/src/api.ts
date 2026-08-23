@@ -1,4 +1,4 @@
-import type { AskResponse, Conversation, Document, UploadResponse } from './types'
+import type { AskResponse, Conversation, Document, UploadJobResponse, IngestionStatus } from './types'
 
 async function readError(response: Response): Promise<string> {
   if (response.status === 502 || response.status === 503 || response.status === 504) {
@@ -37,8 +37,6 @@ export async function askQuestion(
 
   const data = await response.json();
 
-  // Backends may return citations instead of a simple `sources` string array.
-  // Normalize common shapes so the UI can always rely on `sources: string[]`.
   if (!('sources' in data) && Array.isArray((data as any).citations)) {
     (data as any).sources = (data as any).citations.map((c: any) => c.source ?? c.title ?? c.url ?? c.doc_id ?? JSON.stringify(c));
   }
@@ -46,7 +44,7 @@ export async function askQuestion(
   return data as AskResponse
 }
 
-export async function uploadPdf(file: File): Promise<UploadResponse> {
+export async function uploadPdf(file: File): Promise<UploadJobResponse> {
   const body = new FormData()
   body.append('file', file)
 
@@ -59,7 +57,30 @@ export async function uploadPdf(file: File): Promise<UploadResponse> {
     throw new Error(await readError(response))
   }
 
-  return response.json() as Promise<UploadResponse>
+  return response.json() as Promise<UploadJobResponse>
+}
+
+export async function pollUploadStatus(
+  jobId: string,
+  onUpdate?: (status: IngestionStatus) => void,
+): Promise<IngestionStatus> {
+  const maxAttempts = 90
+  const intervalMs = 2000
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const response = await fetch(`/upload/${encodeURIComponent(jobId)}/status`)
+    if (!response.ok) throw new Error(await readError(response))
+
+    const data = (await response.json()) as IngestionStatus
+    onUpdate?.(data)
+
+    if (data.status === 'ready') return data
+    if (data.status === 'failed') throw new Error(data.error ?? 'Ingestion failed')
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+
+  throw new Error('Ingestion timed out — check backend logs')
 }
 
 export async function listDocuments(): Promise<Document[]> {

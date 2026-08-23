@@ -1,8 +1,8 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import uuid
+from fastapi import FastAPI, File, HTTPException, UploadFile, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
 from app_data.contextualize import contextualize_query
@@ -12,6 +12,8 @@ from app_data.ingestion import ingest_upload, list_documents, delete_document, r
 from app_data.models import Question
 from app_data.synthesis import synthesize_answer, check_groundedness
 
+
+ingestion_jobs: dict[str, dict] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -118,18 +120,38 @@ async def ask(que: Question):
         logger.exception("Error while processing /ask request")
         raise HTTPException(status_code=500, detail=str(e))
 
+async def run_ingestion_job(job_id: str, filename: str, content: bytes):
+    try:
+        result = await asyncio.to_thread(ingest_upload, filename, content)
+        ingestion_jobs[job_id] = {"status": "ready", **result}
+    except ValueError as e:
+        ingestion_jobs[job_id] = {"status": "failed", "error": str(e)}
+    except Exception as e:
+        logger.exception("Error while processing ingestion job %s", job_id)
+        ingestion_jobs[job_id] = {"status": "failed", "error": str(e)}
 
 @app.post("/upload")
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile, background_tasks: BackgroundTasks):
     try:
         content = await file.read()
-        result = await asyncio.to_thread(ingest_upload, file.filename or "", content)
-        return {
-            "message": "File uploaded and ingested successfully.",
-            **result,
-        }
+        filename = file.filename or ""
     except ValueError as e:
+        logger.exception("Error while reading uploaded file")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Error while processing /upload request")
         raise HTTPException(status_code=500, detail=str(e))
+
+    job_id = str(uuid.uuid4())
+    ingestion_jobs[job_id] = {"status": "processing"}
+
+    background_tasks.add_task(run_ingestion_job, job_id, filename, content)
+
+    return {"job_id": job_id, "status": "processing"}
+
+@app.get("/upload/{job_id}/status")
+async def get_upload_status(job_id: str):
+    job = ingestion_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job_id")
+    return job
