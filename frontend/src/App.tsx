@@ -18,7 +18,7 @@ const EXAMPLES = [
   'How do coral reefs affect coastal economies during climate change?',
 ]
 
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
 const RESEARCH_STAGES = [
   { label: 'Planning', detail: 'Breaking the question into research hops' },
@@ -268,7 +268,7 @@ function App() {
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError('File exceeds the 25 MB limit.')
+      setUploadError('File exceeds the 8 MB limit.')
       return
     }
 
@@ -403,7 +403,7 @@ function App() {
                 'Drop a PDF here, or browse'
               )}
             </span>
-            <span className="dropzone-hint">PDF only · up to 25 MB</span>
+            <span className="dropzone-hint">PDF only · up to 8 MB</span>
           </label>
 
           {uploading && (

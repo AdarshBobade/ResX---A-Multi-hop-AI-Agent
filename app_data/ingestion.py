@@ -11,7 +11,7 @@ UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 MB max capacity of the pdf
 
 BATCH_SIZE = 16
 
@@ -51,9 +51,9 @@ def reset_session_database() -> None:
 
 
 # Chunking
-def chunk_text(text, chunk_size=500):
+def chunk_text(text, chunk_size=300):
     words = text.split()
-    overlap = 100  # Overlapping Chunking
+    overlap = 75  # Overlapping Chunking
     return [
         " ".join(words[i : i + chunk_size])
         for i in range(0, len(words), chunk_size - overlap)
