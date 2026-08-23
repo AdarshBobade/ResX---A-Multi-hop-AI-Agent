@@ -1,7 +1,7 @@
 import uuid
 import hashlib
 from pathlib import Path
-
+import gc
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from pypdf import PdfReader
@@ -12,6 +12,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB
+
+BATCH_SIZE = 16
 
 # Chroma
 client = chromadb.PersistentClient(path="./chroma_db")
@@ -92,9 +94,7 @@ def ingest_pdf(path: str | Path,
         chunks = chunk_text(text)
 
         for chunk in chunks:
-
             documents.append(chunk)
-
             metadatas.append({
                                 "doc_id": doc_id,
                                 "source": path.name,
@@ -109,11 +109,16 @@ def ingest_pdf(path: str | Path,
     if not documents:
         raise ValueError("No extractable text found in the PDF.")
 
-    collection.add(
-                        documents=documents,
-                        ids=ids,
-                        metadatas=metadatas
-                    )
+    total = len(documents)
+    for start in range(0, total, BATCH_SIZE):
+        end = min(start + BATCH_SIZE, total)
+        collection.add(
+            documents=documents[start:end],
+            ids=ids[start:end],
+            metadatas=metadatas[start:end],
+        )
+        gc.collect()  # release intermediate tensors before the next batch
+
     from app_data.retrieval import invalidate_bm25_cache
     invalidate_bm25_cache()
 
