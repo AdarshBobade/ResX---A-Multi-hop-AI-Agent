@@ -415,6 +415,7 @@ SYNTHESIS_SYSTEM_PROMPT = """
                                 21. The final answer should feel like a thorough research response, not a
                                 short factual response.
 
+                                22.Format all mathematical expressions using LaTeX with $...$ for inline math and $$...$$ for block/display equations.
 
                                 Return only the final answer to the user's question.
                                 """

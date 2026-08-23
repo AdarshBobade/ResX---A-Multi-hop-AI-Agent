@@ -13,7 +13,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {".pdf"}
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 MB max capacity of the pdf
 
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
 # Chroma
 client = chromadb.PersistentClient(path="./chroma_db")
@@ -78,56 +78,47 @@ def ingest_pdf(path: str | Path,
     doc_id = uuid.uuid4().hex
     filename = original_filename or path.name
 
-    documents = []
-    metadatas = []
-    ids = []
-
     chunk_index = 0
+    total_chunks = 0
 
     for page_number, page in enumerate(reader.pages, start=1):
-
         text = page.extract_text() or ""
-
         if not text.strip():
             continue
 
         chunks = chunk_text(text)
+        if not chunks:
+            continue
 
-        for chunk in chunks:
-            documents.append(chunk)
-            metadatas.append({
-                                "doc_id": doc_id,
-                                "source": path.name,
-                                "page": page_number,
-                                "chunk_index": chunk_index,
-                                "file_hash": file_hash or ""
-                            })
+        page_ids = [f"{doc_id}-{chunk_index + i}" for i in range(len(chunks))]
+        page_metadatas = [{
+            "doc_id": doc_id,
+            "source": filename,
+            "page": page_number,
+            "chunk_index": chunk_index + i,
+            "file_hash": file_hash or ""
+        } for i in range(len(chunks))]
 
-            ids.append(f"{doc_id}-{chunk_index}")
-            chunk_index += 1
+        # Add this page's chunks immediately — never holds more than
+        # one page's worth of text + embeddings in memory at once.
+        collection.add(documents=chunks, ids=page_ids, metadatas=page_metadatas)
+        gc.collect()
 
-    if not documents:
+        chunk_index += len(chunks)
+        total_chunks += len(chunks)
+
+    if total_chunks == 0:
         raise ValueError("No extractable text found in the PDF.")
-
-    total = len(documents)
-    for start in range(0, total, BATCH_SIZE):
-        end = min(start + BATCH_SIZE, total)
-        collection.add(
-            documents=documents[start:end],
-            ids=ids[start:end],
-            metadatas=metadatas[start:end],
-        )
-        gc.collect()  # release intermediate tensors before the next batch
 
     from app_data.retrieval import invalidate_bm25_cache
     invalidate_bm25_cache()
 
     return {
-                "doc_id": doc_id,
-                "filename": path.name,
-                "chunks": len(documents),
-                "pages": len(reader.pages)
-            }
+        "doc_id": doc_id,
+        "filename": path.name,
+        "chunks": total_chunks,
+        "pages": len(reader.pages)
+    }
 
 
 # Save upload
