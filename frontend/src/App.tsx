@@ -7,7 +7,10 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
+import 'katex/dist/katex.min.css'
 import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { askQuestion, deleteDocument, uploadPdf, pollUploadStatus } from './api'
 import type { AskResponse, Conversation, Document } from './types'
 import './App.css'
@@ -43,7 +46,7 @@ function isTableSeparator(line: string) {
 }
 
 function MarkdownTableCell({ content }: { content: string }) {
-  return <ReactMarkdown>{content}</ReactMarkdown>
+  return <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{content}</ReactMarkdown>
 }
 
 function MarkdownTable({ rows }: { rows: string[][] }) {
@@ -78,7 +81,11 @@ function MarkdownContent({ text }: { text: string }) {
 
   const flushMarkdown = () => {
     if (markdownLines.length > 0) {
-      blocks.push(<ReactMarkdown key={`markdown-${blocks.length}`}>{markdownLines.join('\n')}</ReactMarkdown>)
+            blocks.push(
+                        <ReactMarkdown key={`markdown-${blocks.length}`} remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {markdownLines.join('\n')}
+                        </ReactMarkdown>
+                      )
       markdownLines = []
     }
   }
