@@ -314,6 +314,12 @@ function App() {
         },
         ...prev,
       ])
+      // New document changes the retrieval context — stale conversation
+      // history and the previously displayed answer no longer apply.
+      setHistory([])
+      setResult(null)
+      setError(null)
+
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {
@@ -334,6 +340,9 @@ function App() {
     try {
       await deleteDocument(document.doc_id)
       setUploads((prev) => prev.filter((item) => item.doc_id !== document.doc_id))
+      setHistory([])
+      setResult(null)
+      setError(null)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Could not delete document.')
     } finally {
@@ -351,6 +360,14 @@ function App() {
     setDragOver(false)
     const file = event.dataTransfer.files?.[0]
     if (file) void processFile(file)
+  }
+
+  function handleClearSession() {
+    setHistory([])
+    setResult(null)
+    setError(null)
+    setProgressState('idle')
+    setProgressStage(-1)
   }
 
   const busy = loading || uploading
@@ -476,6 +493,19 @@ function App() {
           />
           <div className="ask-actions">
             <span className="char-count">{query.length}/300</span>
+            {(history.length > 0 || result) && (
+              <button
+                type="button"
+                className="clear-session-btn"
+                onClick={handleClearSession}
+                disabled={busy}
+              >
+                <svg className="clear-session-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z" />
+                </svg>
+                New session
+              </button>
+            )}
             <button type="submit" disabled={busy || !query.trim()}>
               {loading ? (
                 <>
