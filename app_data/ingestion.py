@@ -70,13 +70,15 @@ def calculate_file_hash(content: bytes) -> str:
 # Ingest PDF
 def ingest_pdf(path: str | Path,
                file_hash: str | None = None,
-               original_filename: str | None = None) -> dict:
+               original_filename: str | None = None,
+               progress_callback=None) -> dict:
 
     path = Path(path)
     reader = PdfReader(str(path))
 
     doc_id = uuid.uuid4().hex
     filename = original_filename or path.name
+    total_pages = len(reader.pages)
 
     chunk_index = 0
     total_chunks = 0
@@ -84,10 +86,14 @@ def ingest_pdf(path: str | Path,
     for page_number, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
         if not text.strip():
+            if progress_callback:
+                progress_callback(page_number, total_pages)
             continue
 
         chunks = chunk_text(text)
         if not chunks:
+            if progress_callback:
+                progress_callback(page_number, total_pages)
             continue
 
         page_ids = [f"{doc_id}-{chunk_index + i}" for i in range(len(chunks))]
@@ -99,13 +105,15 @@ def ingest_pdf(path: str | Path,
             "file_hash": file_hash or ""
         } for i in range(len(chunks))]
 
-        # Add this page's chunks immediately — never holds more than
-        # one page's worth of text + embeddings in memory at once.
+    
         collection.add(documents=chunks, ids=page_ids, metadatas=page_metadatas)
         gc.collect()
 
         chunk_index += len(chunks)
         total_chunks += len(chunks)
+
+        if progress_callback:
+            progress_callback(page_number, total_pages)
 
     if total_chunks == 0:
         raise ValueError("No extractable text found in the PDF.")
@@ -117,7 +125,7 @@ def ingest_pdf(path: str | Path,
         "doc_id": doc_id,
         "filename": path.name,
         "chunks": total_chunks,
-        "pages": len(reader.pages)
+        "pages": total_pages
     }
 
 
@@ -209,7 +217,7 @@ def list_documents() -> list[dict]:
 
 
 
-def ingest_upload(filename: str, content: bytes) -> dict:
+def ingest_upload(filename: str, content: bytes, progress_callback=None) -> dict:
     file_hash = calculate_file_hash(content)
 
     # 1. Check if EXACT same file already exists
@@ -234,9 +242,6 @@ def ingest_upload(filename: str, content: bytes) -> dict:
             "already_exists": True,
         }
 
-    # 2. Check if same filename exists
-    # If contents changed, replace the old version.
-
     existing_filename = collection.get(
         where={
             "source": filename
@@ -259,7 +264,8 @@ def ingest_upload(filename: str, content: bytes) -> dict:
     path = save_upload(filename, content)
     result = ingest_pdf(path=path,
                         file_hash=file_hash,
-                        original_filename=filename)
+                        original_filename=filename,
+                        progress_callback=progress_callback)
 
     result["path"] = str(path)
     result["already_exists"] = False

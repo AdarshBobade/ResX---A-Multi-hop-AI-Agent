@@ -65,6 +65,8 @@ export type IngestionStatus = {
   already_exists?: boolean
   path?: string
   error?: string
+  current_page?: number
+  total_pages?: number
 }
 
 export type Document = {

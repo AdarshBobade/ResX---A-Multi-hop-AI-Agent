@@ -121,6 +121,12 @@ async def ask(que: Question):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def run_ingestion_job(job_id: str, filename: str, content: bytes):
+    def progress_callback(current_page: int, total_pages: int):
+        ingestion_jobs[job_id] = {
+            "status": "processing",
+            "current_page": current_page,
+            "total_pages": total_pages,
+        }
     try:
         result = await asyncio.to_thread(ingest_upload, filename, content)
         ingestion_jobs[job_id] = {"status": "ready", **result}

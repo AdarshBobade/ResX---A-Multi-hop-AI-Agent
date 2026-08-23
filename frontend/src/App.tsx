@@ -143,16 +143,6 @@ function formatLabel(value: string) {
     .replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
-function estimateUploadProgress(elapsedMs: number, fileSizeBytes: number): number {
-  const sizeMb = fileSizeBytes / (1024 * 1024)
-  // Bigger files get a longer estimated duration — roughly 20s per MB,
-  // clamped between 15s and 4 minutes so tiny/huge files stay sane.
-  const estimatedTotalMs = Math.min(Math.max(sizeMb * 20000, 15000), 240000)
-  const tau = estimatedTotalMs / 3
-  const raw = 1 - Math.exp(-elapsedMs / tau)
-  return Math.min(raw * 100, 96) // never claims 100% until the real status says so
-}
-
 function progressPhaseLabel(progress: number): string {
   if (progress < 8) return 'Reading document…'
   if (progress < 92) return 'Extracting & embedding chunks…'
@@ -210,7 +200,7 @@ function App() {
   const [uploading, setUploading] = useState(false)
   const [uploadStage, setUploadStage] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
-  const progressIntervalRef = useRef<number | null>(null)
+  const [uploadPageInfo, setUploadPageInfo] = useState<{ current: number; total: number } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -288,20 +278,19 @@ function App() {
     setUploadError(null)
     setUploadStage('Uploading…')
     setUploadProgress(0)
-
-    const startTime = Date.now()
-    const fileSize = file.size
-
-    progressIntervalRef.current = window.setInterval(() => {
-      setUploadProgress(estimateUploadProgress(Date.now() - startTime, fileSize))
-    }, 200)
+    setUploadPageInfo(null)
 
     try {
       const { job_id } = await uploadPdf(file)
-      setUploadStage('Extracting & embedding…')
-      const status = await pollUploadStatus(job_id)
+      setUploadStage('Extracting & embedding pages…')
 
-      if (progressIntervalRef.current) window.clearInterval(progressIntervalRef.current)
+      const status = await pollUploadStatus(job_id, (update) => {
+        if (update.total_pages && update.current_page !== undefined) {
+          setUploadPageInfo({ current: update.current_page, total: update.total_pages })
+          setUploadProgress(Math.round((update.current_page / update.total_pages) * 100))
+        }
+      })
+
       setUploadProgress(100)
 
       setUploads((prev) => [
@@ -314,21 +303,18 @@ function App() {
         },
         ...prev,
       ])
-      // New document changes the retrieval context — stale conversation
-      // history and the previously displayed answer no longer apply.
       setHistory([])
       setResult(null)
       setError(null)
-
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {
-      if (progressIntervalRef.current) window.clearInterval(progressIntervalRef.current)
       setUploading(false)
       window.setTimeout(() => {
         setUploadStage('')
         setUploadProgress(0)
-      }, 700) // let the 100% moment flash briefly before resetting
+        setUploadPageInfo(null)
+      }, 700)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -436,7 +422,10 @@ function App() {
                 <div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
               </div>
               <div className="upload-progress-meta">
-                <span>{progressPhaseLabel(uploadProgress)}</span>
+                <span>
+                  {progressPhaseLabel(uploadProgress)}
+                  {uploadPageInfo && ` · page ${uploadPageInfo.current} of ${uploadPageInfo.total}`}
+                </span>
                 <span>{Math.round(uploadProgress)}%</span>
               </div>
             </div>
