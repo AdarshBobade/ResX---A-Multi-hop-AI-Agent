@@ -6,9 +6,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-frontend-61DAFB?logo=react)](https://react.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7?logo=render)](https://resx-a-multi-hop-ai-agent-frontend.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7?logo=render)](https://resx-v1.onrender.com)
 
-**🔗 Live demo:** [resx-a-multi-hop-ai-agent-frontend.onrender.com](https://resx-a-multi-hop-ai-agent-frontend.onrender.com)
+**🔗 Live demo:** [resx-v1.onrender.com](https://resx-v1.onrender.com)
 
 > Hosted on Render's free tier — the backend spins down after ~15 minutes of inactivity, so the first request after a while can take 50+ seconds to wake up. Subsequent requests are fast.
 
