@@ -1,3 +1,4 @@
+import os
 import logging
 import time
 from functools import wraps
@@ -5,11 +6,16 @@ from pathlib import Path
 
 Path("logs").mkdir(parents=True, exist_ok=True)
 
+log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    filename="logs/research.log",
-    filemode="a"
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("logs/research.log", mode="a", encoding="utf-8"),
+    ],
 )
 
 

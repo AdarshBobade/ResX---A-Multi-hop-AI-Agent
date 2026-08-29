@@ -1,5 +1,7 @@
 import type { AskResponse, Conversation, Document, UploadJobResponse, IngestionStatus } from './types'
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
 async function readError(response: Response): Promise<string> {
   if (response.status === 502 || response.status === 503 || response.status === 504) {
     return 'API is unreachable. Start the backend with: .venv/bin/uvicorn app_data.main:app --reload --port 8000'
@@ -20,7 +22,7 @@ export async function askQuestion(
   history: Conversation[],
   options: { webSearch: boolean; deepResearch: boolean },
 ): Promise<AskResponse> {
-  const response = await fetch('/ask', {
+  const response = await fetch(`${API_BASE_URL}/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -48,7 +50,7 @@ export async function uploadPdf(file: File): Promise<UploadJobResponse> {
   const body = new FormData()
   body.append('file', file)
 
-  const response = await fetch('/upload', {
+  const response = await fetch(`${API_BASE_URL}/upload`, {
     method: 'POST',
     body,
   })
@@ -68,7 +70,7 @@ export async function pollUploadStatus(
   const intervalMs = 2000
 
   for (let i = 0; i < maxAttempts; i++) {
-    const response = await fetch(`/upload/${encodeURIComponent(jobId)}/status`)
+    const response = await fetch(`${API_BASE_URL}/upload/${encodeURIComponent(jobId)}/status`)
     if (!response.ok) throw new Error(await readError(response))
 
     const data = (await response.json()) as IngestionStatus
@@ -84,13 +86,13 @@ export async function pollUploadStatus(
 }
 
 export async function listDocuments(): Promise<Document[]> {
-  const response = await fetch('/documents')
+  const response = await fetch(`${API_BASE_URL}/documents`)
   if (!response.ok) throw new Error(await readError(response))
   const data = (await response.json()) as { documents?: Document[] }
   return Array.isArray(data.documents) ? data.documents : []
 }
 
 export async function deleteDocument(docId: string): Promise<void> {
-  const response = await fetch(`/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' })
+  const response = await fetch(`${API_BASE_URL}/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' })
   if (!response.ok) throw new Error(await readError(response))
 }

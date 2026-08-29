@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 import uuid
 from fastapi import FastAPI, HTTPException, UploadFile, BackgroundTasks
@@ -17,17 +18,25 @@ ingestion_jobs: dict[str, dict] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start every backend session with an empty document index."""
-    reset_session_database()
+    """
+    Optionally reset the database on startup if RESET_DB_ON_STARTUP=true.
+    Defaults to false to preserve documents across restarts in production.
+    """
+    if os.getenv("RESET_DB_ON_STARTUP", "false").lower() == "true":
+        reset_session_database()
     yield
 
 
 app = FastAPI(lifespan=lifespan)
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Parse CORS origins from environment variable
+cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
+if cors_origins_env:
+    allowed_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+else:
+    # Default to localhost development ports
+    allowed_origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
@@ -36,7 +45,11 @@ app.add_middleware(
         "http://127.0.0.1:5175",
         "http://localhost:5176",
         "http://127.0.0.1:5176",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

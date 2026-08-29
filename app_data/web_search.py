@@ -5,12 +5,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-client = TavilyClient(api_key=tavily_api)
+client = TavilyClient(api_key=tavily_api) if tavily_api else None
 
 
 def web_search(query:str,
                search_depth: str = "basic",
                topic: str = "general") -> list[Evidence] :
+    if client is None:
+        logger.warning("Web search requested but TAVILY_API_KEY is not configured.")
+        return []
+
     normalized_topic = topic if topic in {"general", "news", "finance"} else "general"
     normalized_depth = search_depth if search_depth in {"basic", "advanced"} else "basic"
 

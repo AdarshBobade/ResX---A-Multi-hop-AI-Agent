@@ -1,3 +1,4 @@
+import os
 import uuid
 import hashlib
 from pathlib import Path
@@ -7,7 +8,7 @@ from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunct
 from pypdf import PdfReader
 
 # File config
-UPLOAD_DIR = Path("data/uploads")
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "data/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
@@ -16,7 +17,8 @@ MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 MB max capacity of the pdf
 BATCH_SIZE = 8
 
 # Chroma
-client = chromadb.PersistentClient(path="./chroma_db")
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
+client = chromadb.PersistentClient(path=CHROMA_PATH)
 embed_fn = SentenceTransformerEmbeddingFunction(
     model_name="all-MiniLM-L6-v2"
 )
@@ -271,6 +273,7 @@ def ingest_upload(filename: str, content: bytes, progress_callback=None) -> dict
     result["already_exists"] = False
 
     return result
+
 
 
 
