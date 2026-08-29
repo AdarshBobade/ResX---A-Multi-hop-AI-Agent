@@ -85,12 +85,22 @@ def ingest_pdf(path: str | Path,
     chunk_index = 0
     total_chunks = 0
 
-
-    # Batching reduces ChromaDB/embedding overhead from N page-level calls to 1-2 bulk inserts
-    
+    # Batch in smaller chunks (50) to avoid OOM on large PDFs
+    FLUSH_THRESHOLD = 50
     all_chunks = []
     all_ids = []
     all_metadatas = []
+
+    def flush_batch():
+        """Insert accumulated batch into ChromaDB to free memory"""
+        nonlocal total_chunks
+        if all_chunks:
+            collection.add(documents=all_chunks, ids=all_ids, metadatas=all_metadatas)
+            total_chunks += len(all_chunks)
+            all_chunks.clear()
+            all_ids.clear()
+            all_metadatas.clear()
+            gc.collect()
 
     for page_number, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
@@ -114,23 +124,27 @@ def ingest_pdf(path: str | Path,
             "file_hash": file_hash or ""
         } for i in range(len(chunks))]
 
-        #Accumulate instead of immediate insert
         all_chunks.extend(chunks)
         all_ids.extend(page_ids)
         all_metadatas.extend(page_metadatas)
 
         chunk_index += len(chunks)
-        total_chunks += len(chunks)
+
+        # Flush every FLUSH_THRESHOLD chunks to limit memory usage
+        if len(all_chunks) >= FLUSH_THRESHOLD:
+            flush_batch()
 
         if progress_callback:
             progress_callback(page_number, total_pages)
 
+    # Flush any remaining chunks
+    if all_chunks:
+        collection.add(documents=all_chunks, ids=all_ids, metadatas=all_metadatas)
+        total_chunks += len(all_chunks)
+
     if total_chunks == 0:
         raise ValueError("No extractable text found in the PDF.")
 
-    #Single batched insert instead of per-page inserts
-    #SentenceTransformer processes all embeddings in optimized batches
-    collection.add(documents=all_chunks, ids=all_ids, metadatas=all_metadatas)
     gc.collect()
 
     from app_data.retrieval import invalidate_bm25_cache
