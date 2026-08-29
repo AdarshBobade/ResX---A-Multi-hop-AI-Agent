@@ -203,6 +203,7 @@ function App() {
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [result, setResult] = useState<AskResponse | null>(null)
   const [history, setHistory] = useState<Conversation[]>([])
   const [uploads, setUploads] = useState<Document[]>([])
@@ -275,21 +276,26 @@ function App() {
     const name = file.name.toLowerCase()
     if (!name.endsWith('.pdf')) {
       setUploadError('Only PDF files are supported.')
+      setSelectedFile(null)
       return
     }
 
+    // Option 2: Block upload if file is too large
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError('File exceeds the 8 MB limit.')
+      setUploadError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 8 MB. Please compress or split your PDF.`)
+      setSelectedFile(null)
       return
     }
 
     if (file.size === 0) {
       setUploadError('Uploaded file is empty.')
+      setSelectedFile(null)
       return
     }
 
     setUploading(true)
     setUploadError(null)
+    setSelectedFile(null)
     setUploadStage('Uploading…')
     setUploadProgress(0)
     setUploadPageInfo(null)
@@ -352,14 +358,20 @@ function App() {
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (file) void processFile(file)
+    if (file) {
+      setSelectedFile(file)
+      void processFile(file)
+    }
   }
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
     setDragOver(false)
     const file = event.dataTransfer.files?.[0]
-    if (file) void processFile(file)
+    if (file) {
+      setSelectedFile(file)
+      void processFile(file)
+    }
   }
 
   function handleClearSession() {
@@ -448,6 +460,25 @@ function App() {
           {uploadError && (
             <div className="banner error upload-banner" role="alert">
               {uploadError}
+            </div>
+          )}
+
+          {selectedFile && !uploading && !uploadError && (
+            <div
+              className={`file-size-indicator ${
+                selectedFile.size > 8_000_000 ? 'size-error' :
+                selectedFile.size > 5_000_000 ? 'size-warning' :
+                'size-ok'
+              }`}
+              role="status"
+            >
+              <span className="file-size-name">{selectedFile.name}</span>
+              <span className="file-size-meta">
+                {(selectedFile.size / (1024 * 1024)).toFixed(1)} MB
+                {selectedFile.size > 8_000_000 && ' · Too large'}
+                {selectedFile.size > 5_000_000 && selectedFile.size <= 8_000_000 && ' · May be slow to process'}
+                {selectedFile.size <= 5_000_000 && ' · Optimal size'}
+              </span>
             </div>
           )}
 
