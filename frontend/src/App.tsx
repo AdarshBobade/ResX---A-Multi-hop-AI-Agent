@@ -4,7 +4,6 @@ import {
   useState,
   type ChangeEvent,
   type DragEvent,
-  type FormEvent,
   type ReactNode,
 } from 'react'
 import 'katex/dist/katex.min.css'
@@ -217,14 +216,29 @@ function App() {
   useEffect(() => {
     if (!loading) return
 
-    const interval = window.setInterval(() => {
-      setProgressStage((current) => Math.min(current + 1, RESEARCH_STAGES.length - 1))
-    }, 900)
+    // Advance through stages gradually, but never reach the final
+    // "Synthesizing" stage until the real response arrives.  The interval
+    // lengthens as the bar advances so it doesn't outrun the backend.
+    const maxAutoStage = RESEARCH_STAGES.length - 2
+    const baseInterval = 1200
 
-    return () => window.clearInterval(interval)
+    const tick = () => {
+      setProgressStage((current) => {
+        if (current >= maxAutoStage) return current
+        const next = current + 1
+        // Slow the timer as we get further along
+        const nextDelay = baseInterval + next * 600
+        timer = window.setTimeout(tick, nextDelay)
+        return next
+      })
+    }
+
+    let timer = window.setTimeout(tick, baseInterval)
+
+    return () => window.clearTimeout(timer)
   }, [loading])
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = query.trim()
     if (!trimmed || loading || uploading) return

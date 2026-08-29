@@ -2,7 +2,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 import uuid
-from fastapi import FastAPI, File, HTTPException, UploadFile, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
 from app_data.contextualize import contextualize_query
@@ -128,7 +128,7 @@ async def run_ingestion_job(job_id: str, filename: str, content: bytes):
             "total_pages": total_pages,
         }
     try:
-        result = await asyncio.to_thread(ingest_upload, filename, content)
+        result = await asyncio.to_thread(ingest_upload, filename, content, progress_callback)
         ingestion_jobs[job_id] = {"status": "ready", **result}
     except ValueError as e:
         ingestion_jobs[job_id] = {"status": "failed", "error": str(e)}
