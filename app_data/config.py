@@ -78,8 +78,15 @@ def llm_with_fallback(
             fallback_model,
         )
 
-        return client.chat.completions.create(
-            model=fallback_model,
-            messages=messages,
-            max_tokens=fallback_max_tokens or min(max_tokens, 900),
-        )
+        try:
+            return client.chat.completions.create(
+                model=fallback_model,
+                messages=messages,
+                max_tokens=fallback_max_tokens or min(max_tokens, 900),
+            )
+        except (RateLimitError, APIStatusError) as fallback_exc:
+            logger.error(
+                "Fallback model %s also hit rate limit. Both models exhausted.",
+                fallback_model,
+            )
+            raise fallback_exc
