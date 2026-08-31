@@ -28,7 +28,7 @@ def get_embedding_function():
     global _embed_fn
     if _embed_fn is None:
         _embed_fn = SentenceTransformerEmbeddingFunction(
-            model_name="paraphrase-MiniLM-L3-v2"
+            model_name="all-MiniLM-L6-v2"
         )
     return _embed_fn
 
