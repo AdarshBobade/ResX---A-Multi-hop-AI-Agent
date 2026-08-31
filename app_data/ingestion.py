@@ -28,7 +28,7 @@ def get_embedding_function():
     global _embed_fn
     if _embed_fn is None:
         _embed_fn = SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
+            model_name="paraphrase-MiniLM-L3-v2"
         )
     return _embed_fn
 
@@ -36,11 +36,7 @@ collection = client.get_or_create_collection("docs", embedding_function=get_embe
 
 
 def reset_session_database() -> None:
-    """
-    Clear all indexed documents and uploaded PDFs for a fresh application session.
-
-    This is called once when the FastAPI application starts, not on every upload.
-    """
+    
 
     # Clear documents from the EXISTING collection.
     existing_ids = collection.get()["ids"]
@@ -94,9 +90,9 @@ def ingest_pdf(path: str | Path,
     chunk_index = 0
     total_chunks = 0
 
-    # Batch in smaller chunks (20) to avoid OOM on large PDFs
-    # Reduced from 50 to 20 for Render's memory constraints
-    FLUSH_THRESHOLD = 20
+    # Batch in smaller chunks (15) to avoid OOM on large PDFs
+    
+    FLUSH_THRESHOLD = 15
     all_chunks = []
     all_ids = []
     all_metadatas = []
