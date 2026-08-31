@@ -19,11 +19,20 @@ BATCH_SIZE = 8
 # Chroma
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
 client = chromadb.PersistentClient(path=CHROMA_PATH)
-embed_fn = SentenceTransformerEmbeddingFunction(
-    model_name="all-MiniLM-L6-v2"
-)
 
-collection = client.get_or_create_collection("docs", embedding_function=embed_fn)
+# Lazy load embedding function to reduce startup memory
+_embed_fn = None
+
+def get_embedding_function():
+    
+    global _embed_fn
+    if _embed_fn is None:
+        _embed_fn = SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    return _embed_fn
+
+collection = client.get_or_create_collection("docs", embedding_function=get_embedding_function())
 
 
 def reset_session_database() -> None:
@@ -85,8 +94,9 @@ def ingest_pdf(path: str | Path,
     chunk_index = 0
     total_chunks = 0
 
-    # Batch in smaller chunks (50) to avoid OOM on large PDFs
-    FLUSH_THRESHOLD = 50
+    # Batch in smaller chunks (20) to avoid OOM on large PDFs
+    # Reduced from 50 to 20 for Render's memory constraints
+    FLUSH_THRESHOLD = 20
     all_chunks = []
     all_ids = []
     all_metadatas = []
@@ -104,12 +114,20 @@ def ingest_pdf(path: str | Path,
 
     for page_number, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
+
+        # Release page reference immediately after extraction
+        page = None
+
         if not text.strip():
             if progress_callback:
                 progress_callback(page_number, total_pages)
             continue
 
         chunks = chunk_text(text)
+
+        # Release text after chunking
+        text = None
+
         if not chunks:
             if progress_callback:
                 progress_callback(page_number, total_pages)
@@ -141,11 +159,16 @@ def ingest_pdf(path: str | Path,
     if all_chunks:
         collection.add(documents=all_chunks, ids=all_ids, metadatas=all_metadatas)
         total_chunks += len(all_chunks)
+        all_chunks.clear()
+        all_ids.clear()
+        all_metadatas.clear()
+
+    # Clean up reader and force garbage collection
+    reader = None
+    gc.collect()
 
     if total_chunks == 0:
         raise ValueError("No extractable text found in the PDF.")
-
-    gc.collect()
 
     from app_data.retrieval import invalidate_bm25_cache
     invalidate_bm25_cache()

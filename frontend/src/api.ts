@@ -4,7 +4,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 async function readError(response: Response): Promise<string> {
   if (response.status === 502 || response.status === 503 || response.status === 504) {
-    return 'API is unreachable. Start the backend with: .venv/bin/uvicorn app_data.main:app --reload --port 8000'
+    return 'Connecting to backend... please wait a moment.'
   }
 
   let detail = `Request failed (${response.status})`
